@@ -8,7 +8,7 @@ const API_KEYS = {
 };
 
 // We now only have one entitlement that unlocks everything
-export const ENTITLEMENT_ID = 'entl238df1bd40'; 
+export const ENTITLEMENT_ID = 'pro'; 
 
 export async function initRevenueCat() {
   if (Platform.OS === 'ios') {
