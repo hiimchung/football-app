@@ -3,14 +3,12 @@ import Purchases, { PurchasesOffering, PurchasesPackage, CustomerInfo } from 're
 
 // TODO: Replace with your actual RevenueCat API Keys
 const API_KEYS = {
-  apple: 'test_PhSbQdtgNwQelPHgcNeglwNslME',
-  google: 'test_PhSbQdtgNwQelPHgcNeglwNslME',
+  apple: 'appl_your_apple_api_key',
+  google: 'goog_your_google_api_key',
 };
 
-export const ENTITLEMENT_IDS = {
-  PRO_PLAYER: 'pro_player',     // Must match your RevenueCat Entitlement ID
-  ORGANIZER_PRO: 'organizer_pro', // Must match your RevenueCat Entitlement ID
-};
+// We now only have one entitlement that unlocks everything
+export const ENTITLEMENT_ID = 'pro'; 
 
 export async function initRevenueCat() {
   if (Platform.OS === 'ios') {
@@ -52,22 +50,16 @@ export async function restorePurchases(): Promise<boolean> {
   }
 }
 
-export async function checkProStatus(): Promise<{ isPro: boolean; isOrganizer: boolean }> {
+// Returns true if the user has the 'pro' entitlement
+export async function isProMember(): Promise<boolean> {
   try {
     const customerInfo = await Purchases.getCustomerInfo();
-    return {
-      isPro: customerInfo.entitlements.active[ENTITLEMENT_IDS.PRO_PLAYER] !== undefined,
-      isOrganizer: customerInfo.entitlements.active[ENTITLEMENT_IDS.ORGANIZER_PRO] !== undefined,
-    };
+    return checkEntitlement(customerInfo);
   } catch (e) {
-    return { isPro: false, isOrganizer: false };
+    return false;
   }
 }
 
-// Helper to check if any relevant entitlement is active
 function checkEntitlement(customerInfo: CustomerInfo): boolean {
-  return (
-    customerInfo.entitlements.active[ENTITLEMENT_IDS.PRO_PLAYER] !== undefined ||
-    customerInfo.entitlements.active[ENTITLEMENT_IDS.ORGANIZER_PRO] !== undefined
-  );
+  return customerInfo.entitlements.active[ENTITLEMENT_ID] !== undefined;
 }
