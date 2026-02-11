@@ -1,9 +1,11 @@
 import '../global.css';
+import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../hooks/useNotifications';
+import { initRevenueCat } from '../lib/revenuecat';
 
 function AppContent() {
   const { user } = useAuth();
@@ -30,6 +32,11 @@ function AppContent() {
 
 export default function RootLayout() {
   useFrameworkReady();
+
+  useEffect(() => {
+    // Initialize RevenueCat on app launch
+    initRevenueCat();
+  }, []);
 
   return (
     <AuthProvider>
