@@ -42,20 +42,3 @@ export interface Stats {
   goals: number;
   assists: number;
 }
-
-export type SubscriptionPlan = 'pro_player' | 'organizer_pro' | 'boost_game';
-export type SubscriptionStatus = 'active' | 'cancelled' | 'expired' | 'pending' | 'completed';
-
-export interface Subscription {
-  id: string;
-  user_id: string;
-  paypal_subscription_id?: string;
-  paypal_order_id?: string;
-  plan: SubscriptionPlan;
-  status: SubscriptionStatus;
-  amount: number;
-  currency: string;
-  created_at: string;
-  updated_at: string;
-  expires_at?: string;
-}
