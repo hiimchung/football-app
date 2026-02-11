@@ -1,4 +1,4 @@
-import { isProPlayer, isOrganizerPro } from './paypal';
+import { checkProStatus } from './revenuecat';
 
 export interface FeatureAccess {
   canCreateGames: boolean;
@@ -11,19 +11,16 @@ export interface FeatureAccess {
 }
 
 export async function getFeatureAccess(): Promise<FeatureAccess> {
-  const [proPlayer, organizerPro] = await Promise.all([
-    isProPlayer(),
-    isOrganizerPro(),
-  ]);
+  const { isPro, isOrganizer } = await checkProStatus();
 
   return {
     canCreateGames: true,
-    canBoostGames: organizerPro,
-    canSeeAdvancedStats: proPlayer || organizerPro,
+    canBoostGames: isOrganizer,
+    canSeeAdvancedStats: isPro || isOrganizer,
     canSendMessages: true,
-    maxGamesPerMonth: organizerPro ? -1 : 5,
-    hasProPlayerBadge: proPlayer,
-    hasOrganizerProBadge: organizerPro,
+    maxGamesPerMonth: isOrganizer ? -1 : 5,
+    hasProPlayerBadge: isPro,
+    hasOrganizerProBadge: isOrganizer,
   };
 }
 
@@ -32,21 +29,18 @@ export async function canCreateGame(): Promise<boolean> {
 }
 
 export async function canBoostGame(): Promise<boolean> {
-  const organizerPro = await isOrganizerPro();
-  return organizerPro;
+  const { isOrganizer } = await checkProStatus();
+  return isOrganizer;
 }
 
 export async function canSeeAdvancedStats(): Promise<boolean> {
-  const [proPlayer, organizerPro] = await Promise.all([
-    isProPlayer(),
-    isOrganizerPro(),
-  ]);
-  return proPlayer || organizerPro;
+  const { isPro, isOrganizer } = await checkProStatus();
+  return isPro || isOrganizer;
 }
 
 export async function getMaxGamesPerMonth(): Promise<number> {
-  const organizerPro = await isOrganizerPro();
-  return organizerPro ? -1 : 5;
+  const { isOrganizer } = await checkProStatus();
+  return isOrganizer ? -1 : 5;
 }
 
 export function getFeatureDescription(feature: string): string {
@@ -59,10 +53,9 @@ export function getFeatureDescription(feature: string): string {
   return descriptions[feature] || '';
 }
 
+// NOTE: These fallback prices are only for display if RevenueCat fails to load
 export const SUBSCRIPTION_PRICES = {
   pro_player: {
-    price: 9.99,
-    currency: 'USD',
     name: 'Pro Player',
     description: 'Access to advanced stats and analytics',
     features: [
@@ -73,8 +66,6 @@ export const SUBSCRIPTION_PRICES = {
     ],
   },
   organizer_pro: {
-    price: 19.99,
-    currency: 'USD',
     name: 'Organizer Pro',
     description: 'Everything you need to organize amazing games',
     features: [
@@ -83,17 +74,6 @@ export const SUBSCRIPTION_PRICES = {
       'Advanced statistics',
       'Priority support',
       'Organizer Pro badge',
-    ],
-  },
-  boost_game: {
-    price: 4.99,
-    currency: 'USD',
-    name: 'Boost Game',
-    description: 'One-time boost to promote your game',
-    features: [
-      'Featured placement',
-      'Reach more players',
-      'Valid for 7 days',
     ],
   },
 };
