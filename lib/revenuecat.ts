@@ -3,8 +3,8 @@ import Purchases, { PurchasesOffering, PurchasesPackage, CustomerInfo } from 're
 
 // TODO: Replace with your actual RevenueCat API Keys
 const API_KEYS = {
-  apple: 'appl_your_apple_api_key',
-  google: 'goog_your_google_api_key',
+  apple: 'test_PhSbQdtgNwQelPHgcNeglwNslME',
+  google: 'test_PhSbQdtgNwQelPHgcNeglwNslME',
 };
 
 // We now only have one entitlement that unlocks everything
