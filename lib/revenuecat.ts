@@ -8,7 +8,7 @@ const API_KEYS = {
 };
 
 // We now only have one entitlement that unlocks everything
-export const ENTITLEMENT_ID = 'pro'; 
+export const ENTITLEMENT_ID = 'PickupGames Pro'; 
 
 export async function initRevenueCat() {
   if (Platform.OS === 'ios') {
