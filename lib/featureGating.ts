@@ -1,4 +1,4 @@
-import { checkProStatus } from './revenuecat';
+import { isProMember } from './revenuecat';
 
 export interface FeatureAccess {
   canCreateGames: boolean;
@@ -6,74 +6,50 @@ export interface FeatureAccess {
   canSeeAdvancedStats: boolean;
   canSendMessages: boolean;
   maxGamesPerMonth: number;
-  hasProPlayerBadge: boolean;
-  hasOrganizerProBadge: boolean;
+  hasProBadge: boolean;
 }
 
 export async function getFeatureAccess(): Promise<FeatureAccess> {
-  const { isPro, isOrganizer } = await checkProStatus();
+  const isPro = await isProMember();
 
   return {
     canCreateGames: true,
-    canBoostGames: isOrganizer,
-    canSeeAdvancedStats: isPro || isOrganizer,
+    canBoostGames: isPro,
+    canSeeAdvancedStats: isPro,
     canSendMessages: true,
-    maxGamesPerMonth: isOrganizer ? -1 : 5,
-    hasProPlayerBadge: isPro,
-    hasOrganizerProBadge: isOrganizer,
+    maxGamesPerMonth: isPro ? -1 : 5, // -1 means unlimited
+    hasProBadge: isPro,
   };
 }
 
-export async function canCreateGame(): Promise<boolean> {
-  return true;
-}
-
 export async function canBoostGame(): Promise<boolean> {
-  const { isOrganizer } = await checkProStatus();
-  return isOrganizer;
+  return await isProMember();
 }
 
 export async function canSeeAdvancedStats(): Promise<boolean> {
-  const { isPro, isOrganizer } = await checkProStatus();
-  return isPro || isOrganizer;
+  return await isProMember();
 }
 
 export async function getMaxGamesPerMonth(): Promise<number> {
-  const { isOrganizer } = await checkProStatus();
-  return isOrganizer ? -1 : 5;
+  const isPro = await isProMember();
+  return isPro ? -1 : 5;
 }
 
 export function getFeatureDescription(feature: string): string {
   const descriptions: Record<string, string> = {
-    canBoostGames: 'Boost your games to reach more players. Available with Organizer Pro subscription.',
-    canSeeAdvancedStats: 'View detailed stats and analytics. Available with Pro Player or Organizer Pro subscription.',
-    maxGamesPerMonth: 'Create unlimited games per month with Organizer Pro subscription. Free users can create up to 5 games per month.',
+    canBoostGames: 'Boost your games to reach more players. Available with Pro Subscription.',
+    canSeeAdvancedStats: 'View detailed stats and analytics. Available with Pro Subscription.',
+    maxGamesPerMonth: 'Create unlimited games per month with Pro Subscription. Free users can create up to 5 games.',
   };
 
   return descriptions[feature] || '';
 }
 
-// NOTE: These fallback prices are only for display if RevenueCat fails to load
-export const SUBSCRIPTION_PRICES = {
-  pro_player: {
-    name: 'Pro Player',
-    description: 'Access to advanced stats and analytics',
-    features: [
-      'Advanced statistics',
-      'Performance tracking',
-      'Pro Player badge',
-      'Priority support',
-    ],
-  },
-  organizer_pro: {
-    name: 'Organizer Pro',
-    description: 'Everything you need to organize amazing games',
-    features: [
-      'Unlimited games per month',
-      'Boost games to reach more players',
-      'Advanced statistics',
-      'Priority support',
-      'Organizer Pro badge',
-    ],
-  },
-};
+// Fallback display info
+export const PRO_SUBSCRIPTION_FEATURES = [
+  'Unlimited game creation',
+  'Advanced player statistics',
+  'Boost games to top of list',
+  'Pro profile badge',
+  'Priority support'
+];
