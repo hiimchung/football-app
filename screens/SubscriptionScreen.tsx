@@ -6,82 +6,91 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   StyleSheet,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Crown, Sparkles, TrendingUp, CheckCircle, ArrowLeft } from 'lucide-react-native';
+import { PurchasesPackage } from 'react-native-purchases';
 import Button from '../components/Button';
-import { subscribeToPlan, getUserSubscriptions, isProPlayer, isOrganizerPro } from '../lib/paypal';
+import { getOfferings, purchasePackage, restorePurchases, checkProStatus } from '../lib/revenuecat';
 import { SUBSCRIPTION_PRICES } from '../lib/featureGating';
-import { Subscription } from '../types';
 
 export default function SubscriptionScreen() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
-  const [hasProPlayer, setHasProPlayer] = useState(false);
-  const [hasOrganizerPro, setHasOrganizerPro] = useState(false);
-  const [subscribing, setSubscribing] = useState<string | null>(null);
-  const [error, setError] = useState('');
+  const [packages, setPackages] = useState<PurchasesPackage[]>([]);
+  const [isPro, setIsPro] = useState(false);
+  const [isOrganizer, setIsOrganizer] = useState(false);
+  const [purchasing, setPurchasing] = useState<string | null>(null);
 
   useEffect(() => {
-    loadSubscriptions();
+    loadData();
   }, []);
 
-  const loadSubscriptions = async () => {
+  const loadData = async () => {
     try {
-      const [subsResult, proPlayerStatus, organizerProStatus] = await Promise.all([
-        getUserSubscriptions(),
-        isProPlayer(),
-        isOrganizerPro(),
-      ]);
-
-      if (subsResult.data) {
-        setSubscriptions(subsResult.data);
+      const offerings = await getOfferings();
+      if (offerings && offerings.availablePackages) {
+        setPackages(offerings.availablePackages);
       }
 
-      setHasProPlayer(proPlayerStatus);
-      setHasOrganizerPro(organizerProStatus);
+      const status = await checkProStatus();
+      setIsPro(status.isPro);
+      setIsOrganizer(status.isOrganizer);
     } catch (err) {
-      console.error('Error loading subscriptions:', err);
+      console.error('Error loading subscription data:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSubscribe = async (plan: 'pro_player' | 'organizer_pro') => {
+  const handlePurchase = async (pack: PurchasesPackage) => {
+    setPurchasing(pack.identifier);
     try {
-      setSubscribing(plan);
-      setError('');
-
-      const result = await subscribeToPlan(plan);
-
-      if (result.success) {
-        loadSubscriptions();
-      } else {
-        setError(result.error || 'Failed to start subscription');
+      const success = await purchasePackage(pack);
+      if (success) {
+        Alert.alert('Success', 'Subscription activated!');
+        loadData();
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+    } catch (e) {
+      Alert.alert('Error', 'Purchase failed. Please try again.');
     } finally {
-      setSubscribing(null);
+      setPurchasing(null);
     }
   };
 
-  const renderPlanCard = (
-    plan: 'pro_player' | 'organizer_pro',
-    IconComponent: any,
-    isActive: boolean
-  ) => {
-    const planInfo = SUBSCRIPTION_PRICES[plan];
+  const handleRestore = async () => {
+    setLoading(true);
+    const success = await restorePurchases();
+    setLoading(false);
+    if (success) {
+      Alert.alert('Success', 'Purchases restored!');
+      loadData();
+    } else {
+      Alert.alert('Notice', 'No active subscriptions found to restore.');
+    }
+  };
+
+  const renderPackageCard = (pack: PurchasesPackage) => {
+    // Determine type based on your RevenueCat product identifier conventions
+    // Example: 'pro_monthly' vs 'organizer_monthly'
+    const isOrganizerPackage = pack.product.identifier.includes('organizer');
+    const type = isOrganizerPackage ? 'organizer_pro' : 'pro_player';
+    
+    // Check if this plan is currently active
+    const isActive = isOrganizerPackage ? isOrganizer : isPro;
+    
+    const IconComponent = isOrganizerPackage ? TrendingUp : Crown;
+    const staticInfo = SUBSCRIPTION_PRICES[type];
 
     return (
-      <View style={[styles.planCard, isActive && styles.planCardActive]} key={plan}>
+      <View style={[styles.planCard, isActive && styles.planCardActive]} key={pack.identifier}>
         <View style={styles.planHeader}>
           <View style={styles.planIconWrap}>
             <IconComponent size={24} color="#FFFFFF" />
           </View>
           <View style={styles.planHeaderText}>
-            <Text style={styles.planName}>{planInfo.name}</Text>
+            <Text style={styles.planName}>{pack.product.title}</Text>
             {isActive && (
               <View style={styles.activeBadgeRow}>
                 <CheckCircle size={14} color="#10b981" />
@@ -90,15 +99,15 @@ export default function SubscriptionScreen() {
             )}
           </View>
           <View style={styles.priceWrap}>
-            <Text style={styles.priceAmount}>${planInfo.price}</Text>
-            <Text style={styles.pricePeriod}>/mo</Text>
+            <Text style={styles.priceAmount}>{pack.product.priceString}</Text>
           </View>
         </View>
 
-        <Text style={styles.planDescription}>{planInfo.description}</Text>
+        <Text style={styles.planDescription}>{pack.product.description}</Text>
 
+        {/* Static features list from featureGating file for display purposes */}
         <View style={styles.featureList}>
-          {planInfo.features.map((feature, index) => (
+          {staticInfo.features.map((feature, index) => (
             <View key={index} style={styles.featureRow}>
               <CheckCircle size={16} color="#10b981" />
               <Text style={styles.featureText}>{feature}</Text>
@@ -108,9 +117,9 @@ export default function SubscriptionScreen() {
 
         {!isActive && (
           <Button
-            onPress={() => handleSubscribe(plan)}
-            title={subscribing === plan ? 'Processing...' : 'Subscribe Now'}
-            disabled={subscribing !== null}
+            onPress={() => handlePurchase(pack)}
+            title={purchasing === pack.identifier ? 'Processing...' : 'Subscribe Now'}
+            disabled={purchasing !== null}
           />
         )}
       </View>
@@ -138,51 +147,23 @@ export default function SubscriptionScreen() {
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        {error ? <Text style={styles.errorBanner}>{error}</Text> : null}
-
         <View style={styles.promoCard}>
           <Sparkles size={32} color="#ffffff" />
           <Text style={styles.promoTitle}>Unlock Premium Features</Text>
           <Text style={styles.promoText}>
-            Get access to advanced stats, unlimited games, and more with our subscription plans.
+            Get access to advanced stats, unlimited games, and more.
           </Text>
         </View>
 
-        {renderPlanCard('pro_player', Crown, hasProPlayer)}
-        {renderPlanCard('organizer_pro', TrendingUp, hasOrganizerPro)}
-
-        {subscriptions.length > 0 && (
-          <View style={styles.historySection}>
-            <Text style={styles.historyTitle}>Subscription History</Text>
-            {subscriptions.map((sub) => (
-              <View key={sub.id} style={styles.historyItem}>
-                <View style={styles.historyRow}>
-                  <Text style={styles.historyPlanName}>
-                    {SUBSCRIPTION_PRICES[sub.plan as keyof typeof SUBSCRIPTION_PRICES]?.name ||
-                      sub.plan}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.historyStatus,
-                      sub.status === 'active' && { color: '#10b981' },
-                      sub.status === 'completed' && { color: '#3b82f6' },
-                    ]}
-                  >
-                    {sub.status}
-                  </Text>
-                </View>
-                <View style={styles.historyRow}>
-                  <Text style={styles.historyDate}>
-                    {new Date(sub.created_at).toLocaleDateString()}
-                  </Text>
-                  <Text style={styles.historyAmount}>
-                    ${sub.amount} {sub.currency}
-                  </Text>
-                </View>
-              </View>
-            ))}
-          </View>
+        {packages.length > 0 ? (
+          packages.map(renderPackageCard)
+        ) : (
+          <Text style={styles.emptyText}>No packages available.</Text>
         )}
+
+        <TouchableOpacity style={styles.restoreButton} onPress={handleRestore}>
+          <Text style={styles.restoreButtonText}>Restore Purchases</Text>
+        </TouchableOpacity>
       </ScrollView>
     </View>
   );
@@ -228,17 +209,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 24,
-  },
-  errorBanner: {
-    color: '#ef4444',
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 16,
-    textAlign: 'center',
-    fontSize: 14,
-    fontWeight: '500',
-    overflow: 'hidden',
   },
   promoCard: {
     backgroundColor: '#059669',
@@ -308,12 +278,8 @@ const styles = StyleSheet.create({
   },
   priceAmount: {
     color: '#ffffff',
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '700',
-  },
-  pricePeriod: {
-    color: '#9ca3af',
-    fontSize: 14,
   },
   planDescription: {
     color: '#9ca3af',
@@ -334,46 +300,20 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     fontSize: 15,
   },
-  historySection: {
-    marginTop: 8,
-    marginBottom: 24,
+  emptyText: {
+    color: '#9ca3af',
+    textAlign: 'center',
+    marginTop: 20,
+    fontSize: 16,
   },
-  historyTitle: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 16,
-  },
-  historyItem: {
-    backgroundColor: '#1f2937',
-    borderRadius: 12,
+  restoreButton: {
+    alignItems: 'center',
     padding: 16,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#374151',
+    marginTop: 8,
   },
-  historyRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  historyPlanName: {
-    color: '#ffffff',
-    fontWeight: '600',
-    fontSize: 15,
-  },
-  historyStatus: {
+  restoreButtonText: {
     color: '#9ca3af',
-    fontWeight: '600',
     fontSize: 14,
-    textTransform: 'capitalize',
-  },
-  historyDate: {
-    color: '#9ca3af',
-    fontSize: 13,
-  },
-  historyAmount: {
-    color: '#ffffff',
-    fontSize: 14,
+    textDecorationLine: 'underline',
   },
 });
