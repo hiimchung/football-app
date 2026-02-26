@@ -28,6 +28,43 @@ export async function getCurrentLocation(): Promise<Coordinates | null> {
   }
 }
 
+// NEW: Geocode an address string to coordinates
+export async function geocodeAddress(address: string): Promise<Coordinates | null> {
+  try {
+    const geocodedLocation = await Location.geocodeAsync(address);
+    if (geocodedLocation.length > 0) {
+      return {
+        latitude: geocodedLocation[0].latitude,
+        longitude: geocodedLocation[0].longitude,
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error('Geocoding error:', error);
+    return null;
+  }
+}
+
+// NEW: Reverse geocode coordinates to a readable address
+export async function reverseGeocodeCoords(latitude: number, longitude: number): Promise<string | null> {
+  try {
+    const reverseGeocoded = await Location.reverseGeocodeAsync({ latitude, longitude });
+    if (reverseGeocoded.length > 0) {
+      const address = reverseGeocoded[0];
+      // Format: "123 Main St, New York"
+      const street = address.street || address.name;
+      const city = address.city || address.subregion;
+      if (street && city) return `${street}, ${city}`;
+      if (city) return city;
+      if (address.region) return address.region;
+    }
+    return null;
+  } catch (error) {
+    console.error('Reverse geocoding error:', error);
+    return null;
+  }
+}
+
 export function calculateDistance(
   lat1: number,
   lon1: number,

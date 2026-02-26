@@ -7,9 +7,23 @@ import {
   ActivityIndicator,
   StyleSheet,
   Share,
+  Linking,
+  Platform,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Calendar, MapPin, Users, ArrowLeft, User, MessageCircle, Lock, XCircle, BarChart3, Share as ShareIcon } from 'lucide-react-native';
+import { 
+  Calendar, 
+  MapPin, 
+  Users, 
+  ArrowLeft, 
+  User, 
+  MessageCircle, 
+  Lock, 
+  XCircle, 
+  BarChart3, 
+  Share as ShareIcon,
+  Map 
+} from 'lucide-react-native';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Game, GameStatus, SkillLevel } from '../types';
@@ -121,7 +135,30 @@ export default function GameDetailsScreen() {
     }
   };
 
-  // ... (Keep handleJoinGame, handleLeaveGame, handleCloseGame, handleReopenGame exact same) ...
+  const handleOpenMap = () => {
+    if (!game?.latitude || !game?.longitude) {
+      setError('Location coordinates are not available for this game.');
+      return;
+    }
+    
+    const lat = game.latitude;
+    const lng = game.longitude;
+    const label = encodeURIComponent(game.location || game.title);
+    
+    // Create the correct map URL based on the device platform
+    const url = Platform.select({
+      ios: `maps://?q=${label}&ll=${lat},${lng}`,
+      android: `geo:0,0?q=${lat},${lng}(${label})`,
+    });
+
+    if (url) {
+      Linking.openURL(url).catch(() => {
+        // Fallback to Google Maps in the web browser if native app fails
+        Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`);
+      });
+    }
+  };
+
   const handleJoinGame = async () => {
     if (!user || !game) return;
     if (game.players.length >= game.maxPlayers) {
@@ -253,7 +290,6 @@ export default function GameDetailsScreen() {
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        {/* Rest of the UI is the same */}
         {error && (
           <View style={styles.errorBanner}>
             <Text style={styles.errorBannerText}>{error}</Text>
@@ -346,17 +382,32 @@ export default function GameDetailsScreen() {
           ))}
         </View>
 
+        {/* --- ACTIONS FOR JOINED USERS --- */}
         {isJoined && (
-          <TouchableOpacity
-            style={styles.chatButton}
-            onPress={() => router.push(`/chat/${game.id}` as any)}
-            activeOpacity={0.7}
-          >
-            <MessageCircle size={18} color="#10b981" />
-            <Text style={styles.chatButtonText}>Open Chat</Text>
-          </TouchableOpacity>
+          <>
+            <TouchableOpacity
+              style={styles.chatButton}
+              onPress={() => router.push(`/chat/${game.id}` as any)}
+              activeOpacity={0.7}
+            >
+              <MessageCircle size={18} color="#10b981" />
+              <Text style={styles.chatButtonText}>Open Chat</Text>
+            </TouchableOpacity>
+
+            {game.latitude && game.longitude && (
+              <TouchableOpacity
+                style={styles.directionsButton}
+                onPress={handleOpenMap}
+                activeOpacity={0.7}
+              >
+                <Map size={18} color="#3b82f6" />
+                <Text style={styles.directionsButtonText}>Get Directions</Text>
+              </TouchableOpacity>
+            )}
+          </>
         )}
 
+        {/* --- HOST ACTIONS --- */}
         {isHost && isClosed && (
           <TouchableOpacity
             style={styles.statsButton}
@@ -401,6 +452,7 @@ export default function GameDetailsScreen() {
           )
         )}
 
+        {/* --- LEAVE / JOIN ACTIONS --- */}
         {!isClosed && isJoined && !isHost && (
           <TouchableOpacity
             style={styles.leaveButton}
@@ -669,6 +721,22 @@ const styles = StyleSheet.create({
   },
   chatButtonText: {
     color: '#10b981',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  directionsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#3b82f6',
+    borderRadius: 14,
+    paddingVertical: 16,
+    marginBottom: 12,
+  },
+  directionsButtonText: {
+    color: '#3b82f6',
     fontSize: 16,
     fontWeight: '600',
   },
