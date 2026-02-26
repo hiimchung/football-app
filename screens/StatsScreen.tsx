@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, RefreshControl, StyleSheet } from 'react-native';
-import { Trophy, Target as TargetIcon, Users } from 'lucide-react-native';
+import { Trophy, Target as TargetIcon, Users, Calendar } from 'lucide-react-native';
 import StatCard from '../components/StatCard';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -12,6 +12,7 @@ export default function StatsScreen() {
     goals: 0,
     assists: 0,
   });
+  const [pastGames, setPastGames] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -21,17 +22,19 @@ export default function StatsScreen() {
 
   const fetchStats = async () => {
     try {
+      // 1. Fetch the games the user played in that are closed
       const { data: closedGames, error: gamesError } = await supabase
         .from('game_players')
-        .select('game_id, games!inner(status)')
+        .select('game_id, games!inner(id, title, date, status)')
         .eq('user_id', user?.id)
         .eq('games.status', 'closed');
 
       if (gamesError) throw gamesError;
 
+      // 2. Fetch the actual stat records for the user
       const { data: playerStats, error: statsError } = await supabase
         .from('player_game_stats')
-        .select('goals, assists')
+        .select('game_id, goals, assists')
         .eq('user_id', user?.id);
 
       if (statsError) throw statsError;
@@ -50,6 +53,19 @@ export default function StatsScreen() {
         goals: totalGoals,
         assists: totalAssists,
       });
+
+      // 3. Map the history list together
+      const history = (closedGames || []).map(cg => {
+         const stat = playerStats?.find(s => s.game_id === cg.game_id);
+         return {
+           game: cg.games,
+           goals: stat?.goals || 0,
+           assists: stat?.assists || 0
+         };
+      }).sort((a, b) => new Date(b.game.date).getTime() - new Date(a.game.date).getTime());
+
+      setPastGames(history);
+
     } catch (error) {
       console.error('Error fetching stats:', error);
     } finally {
@@ -115,7 +131,7 @@ export default function StatsScreen() {
         </View>
 
         <View style={styles.overviewCard}>
-          <Text style={styles.overviewTitle}>Performance Overview</Text>
+          <Text style={styles.sectionTitle}>Performance Overview</Text>
           <View style={styles.overviewRow}>
             <Text style={styles.overviewLabel}>Goals per Match</Text>
             <Text style={styles.overviewValue}>
@@ -138,6 +154,35 @@ export default function StatsScreen() {
             <Text style={styles.overviewLabel}>Total Contributions</Text>
             <Text style={styles.overviewValue}>{stats.goals + stats.assists}</Text>
           </View>
+        </View>
+
+        <View style={styles.historySection}>
+          <Text style={styles.sectionTitle}>Recent Games Played</Text>
+          {pastGames.length === 0 ? (
+            <Text style={styles.emptyText}>You haven't played any closed games yet.</Text>
+          ) : (
+            pastGames.map((pg, index) => (
+              <View key={index} style={styles.pastGameCard}>
+                <View style={styles.pastGameLeft}>
+                  <Text style={styles.pastGameTitle} numberOfLines={1}>{pg.game.title}</Text>
+                  <View style={styles.pastGameDateRow}>
+                    <Calendar size={12} color="#9ca3af" />
+                    <Text style={styles.pastGameDate}>{pg.game.date}</Text>
+                  </View>
+                </View>
+                <View style={styles.pastGameRight}>
+                  <View style={styles.statPill}>
+                    <Text style={styles.statPillValue}>{pg.goals}</Text>
+                    <Text style={styles.statPillLabel}>G</Text>
+                  </View>
+                  <View style={styles.statPill}>
+                    <Text style={styles.statPillValue}>{pg.assists}</Text>
+                    <Text style={styles.statPillLabel}>A</Text>
+                  </View>
+                </View>
+              </View>
+            ))
+          )}
         </View>
       </ScrollView>
     </View>
@@ -188,8 +233,9 @@ const styles = StyleSheet.create({
     padding: 24,
     borderWidth: 1,
     borderColor: '#374151',
+    marginBottom: 24,
   },
-  overviewTitle: {
+  sectionTitle: {
     color: '#ffffff',
     fontSize: 18,
     fontWeight: '700',
@@ -214,5 +260,69 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: '#374151',
     marginVertical: 12,
+  },
+  historySection: {
+    marginTop: 8,
+  },
+  emptyText: {
+    color: '#9ca3af',
+    textAlign: 'center',
+    fontSize: 15,
+    marginTop: 10,
+  },
+  pastGameCard: {
+    backgroundColor: '#1f2937',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#374151',
+  },
+  pastGameLeft: {
+    flex: 1,
+    marginRight: 12,
+  },
+  pastGameTitle: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  pastGameDateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  pastGameDate: {
+    color: '#9ca3af',
+    fontSize: 13,
+  },
+  pastGameRight: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  statPill: {
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    minWidth: 44,
+  },
+  statPillValue: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  statPillLabel: {
+    color: '#10b981',
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
   },
 });
