@@ -6,9 +6,10 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   StyleSheet,
+  Share,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Calendar, MapPin, Users, ArrowLeft, User, MessageCircle, Lock, XCircle, BarChart3 } from 'lucide-react-native';
+import { Calendar, MapPin, Users, ArrowLeft, User, MessageCircle, Lock, XCircle, BarChart3, Share as ShareIcon } from 'lucide-react-native';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Game, GameStatus, SkillLevel } from '../types';
@@ -107,6 +108,20 @@ export default function GameDetailsScreen() {
     }
   };
 
+  const handleShare = async () => {
+    if (!game) return;
+    try {
+      const message = `Join my pickup football game "${game.title}" on ${game.date} at ${game.time}!\n\n📍 Location: ${game.location}\n⚽ Skill Level: ${game.skillLevel}\n\nJoin here in the Football Organizer app: myapp://game/${game.id}`;
+      await Share.share({
+        message,
+        title: `Join ${game.title}`,
+      });
+    } catch (error: any) {
+      console.error('Error sharing:', error.message);
+    }
+  };
+
+  // ... (Keep handleJoinGame, handleLeaveGame, handleCloseGame, handleReopenGame exact same) ...
   const handleJoinGame = async () => {
     if (!user || !game) return;
     if (game.players.length >= game.maxPlayers) {
@@ -226,13 +241,19 @@ export default function GameDetailsScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.headerBar}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <ArrowLeft size={24} color="#ffffff" />
+        <View style={styles.headerLeft}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <ArrowLeft size={24} color="#ffffff" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Game Details</Text>
+        </View>
+        <TouchableOpacity onPress={handleShare} style={styles.shareButton}>
+          <ShareIcon size={22} color="#ffffff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Game Details</Text>
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        {/* Rest of the UI is the same */}
         {error && (
           <View style={styles.errorBanner}>
             <Text style={styles.errorBannerText}>{error}</Text>
@@ -440,6 +461,7 @@ const styles = StyleSheet.create({
   },
   headerBar: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 24,
     paddingTop: 52,
@@ -447,6 +469,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#1f2937',
     borderBottomWidth: 1,
     borderBottomColor: '#374151',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 16,
   },
   backButton: {
@@ -461,6 +487,14 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 20,
     fontWeight: '700',
+  },
+  shareButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#374151',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   scrollView: {
     flex: 1,
