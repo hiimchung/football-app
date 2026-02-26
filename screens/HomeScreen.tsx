@@ -7,9 +7,10 @@ import {
   ActivityIndicator,
   RefreshControl,
   StyleSheet,
+  TextInput,
 } from 'react-native';
-import { useRouter } from 'expo-router';
-import { MapPin, Navigation } from 'lucide-react-native';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { MapPin, Navigation, Search } from 'lucide-react-native';
 import GameCard from '../components/GameCard';
 import { SkillLevel, Game } from '../types';
 import { supabase } from '../lib/supabase';
@@ -37,6 +38,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const [selectedFilter, setSelectedFilter] = useState<FilterOption>('All');
+  const [searchQuery, setSearchQuery] = useState('');
   const [games, setGames] = useState<GameWithDistance[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -48,9 +50,12 @@ export default function HomeScreen() {
     initLocation();
   }, []);
 
-  useEffect(() => {
-    fetchGames();
-  }, [userLocation]);
+  // useFocusEffect automatically runs when you switch to this tab or navigate back
+  useFocusEffect(
+    useCallback(() => {
+      fetchGames();
+    }, [userLocation])
+  );
 
   const initLocation = async () => {
     setLocationLoading(true);
@@ -158,13 +163,24 @@ export default function HomeScreen() {
   }, [userLocation]);
 
   const filteredGames = (() => {
-    if (selectedFilter === 'All') return games;
+    let result = games;
+
+    // Filter by skill or distance
     if (selectedFilter === 'Nearby') {
-      return games
+      result = result
         .filter((g) => g.distance != null && g.distance <= 20)
         .sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0));
+    } else if (selectedFilter !== 'All') {
+      result = result.filter((g) => g.skillLevel === selectedFilter);
     }
-    return games.filter((g) => g.skillLevel === selectedFilter);
+
+    // Filter by Creator Search
+    if (searchQuery.trim()) {
+      const lowerQuery = searchQuery.toLowerCase().trim();
+      result = result.filter((g) => g.host.name.toLowerCase().includes(lowerQuery));
+    }
+
+    return result;
   })();
 
   const handleFilterPress = (filter: FilterOption) => {
@@ -193,6 +209,17 @@ export default function HomeScreen() {
           )}
         </View>
         <Text style={styles.pageTitle}>Pickup Games</Text>
+      </View>
+
+      <View style={styles.searchContainer}>
+        <Search size={20} color="#9ca3af" />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search by creator..."
+          placeholderTextColor="#9ca3af"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
       </View>
 
       <View style={styles.filterContainer}>
@@ -256,7 +283,9 @@ export default function HomeScreen() {
         ) : filteredGames.length === 0 ? (
           <View style={styles.centered}>
             <Text style={styles.emptyText}>
-              {selectedFilter === 'Nearby'
+              {searchQuery
+                ? `No games found by "${searchQuery}".`
+                : selectedFilter === 'Nearby'
                 ? userLocation
                   ? 'No games found within 20km. Try creating a new game!'
                   : 'Enable location to see nearby games.'
@@ -319,6 +348,25 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 26,
     fontWeight: '700',
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1f2937',
+    marginHorizontal: 24,
+    marginTop: 16,
+    marginBottom: 8,
+    paddingHorizontal: 16,
+    height: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#374151',
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: 10,
+    color: '#ffffff',
+    fontSize: 15,
   },
   filterContainer: {
     borderBottomWidth: 1,
